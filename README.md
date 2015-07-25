@@ -1,8 +1,8 @@
 # Installers
 ## brimir-on-debian-jessie-amd64
-Installer for the open source email helpdesk from [Ivaldi](https://ivaldi.nl/) named [Brimir](https://getbrimir.com/). 
+Installer for the open source email helpdesk from [Ivaldi](https://ivaldi.nl/) named [Brimir](https://getbrimir.com/).
 
-[Brimir on GitHub](https://github.com/ivaldi/brimir).
+[Visit Brimir on GitHub here](https://github.com/ivaldi/brimir)
 
 
 ## License
