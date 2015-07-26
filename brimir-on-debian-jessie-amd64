@@ -29,7 +29,7 @@ BRIMIR_ADMIN=alexander.jackson@jackson-it.de
 # Dont touch the next variables unless you know what you are doing
 BRIMIR_OWNER=brimir
 BRIMIR_DB=brimir
-BRIMIR_MAIL_DEFAULT_FROM=brimir@$(hostname -d)
+BRIMIR_MAIL_DEFAULT_FROM=support@$(hostname -d)
 BRIMIR_MAIL_DEFAULT_URL=$(hostname -f)
 BRIMIR_HOSTNAME=$(hostname -f)
 export DEBIAN_FRONTEND=noninteractive
@@ -527,7 +527,7 @@ su brimir -c "rake assets:precompile RAILS_ENV=production"
 su brimir -c "bin/rails console production <<EOF
 u = User.new({ email: '${BRIMIR_ADMIN}', password: '${BRIMIR_ADMIN_PW}', password_confirmation: '${BRIMIR_ADMIN_PW}' }); u.agent = true; u.save!
 EOF"
-
+eval sed -i \'s/config.mailer_sender = \".*/config.mailer_sender = \"${BRIMIR_MAIL_DEFAULT_FROM}\"/\' /opt/brimir/config/initializers/devise.rb
 
 # -------------------------------------------
 # Create Brimir mail import alias
