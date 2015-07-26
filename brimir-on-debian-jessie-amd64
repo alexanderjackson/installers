@@ -278,7 +278,8 @@ EOF
 # -------------------------------------------
 # Brimir Dependencies
 # -------------------------------------------
-apt-get install apt-transport-https bundler ca-certificates git rake ruby ruby-dev ruby-execjs ruby-mysql2 zlib1g-dev -y
+#apt-get install apt-transport-https bundler ca-certificates git rake ruby ruby-dev ruby-execjs ruby-mysql2 zlib1g-dev -y
+apt-get install apt-transport-https bundler ca-certificates git ruby ruby-dev ruby-execjs ruby-mysql2 zlib1g-dev -y
 
 
 # -------------------------------------------
@@ -548,8 +549,11 @@ cd /opt/brimir/
 
 su brimir -c "bundle install --without sqlite postgresql development test --deployment"
 su brimir -c 'sed -i "s/<%= ENV\[\"SECRET_KEY_BASE\"\] %>/$(bin/rake secret)/g" config/secrets.yml'
-su brimir -c "bundle exec rake db:schema:load RAILS_ENV=production"
-su brimir -c "bundle exec rake assets:precompile RAILS_ENV=production"
+#su brimir -c "bundle exec rake db:schema:load RAILS_ENV=production"
+#su brimir -c "bundle exec rake assets:precompile RAILS_ENV=production"
+su brimir -c "rake db:schema:load RAILS_ENV=production"
+su brimir -c "rake assets:precompile RAILS_ENV=production"
+
 
 # Create initial admin user
 su brimir -c "bin/rails console production <<EOF
