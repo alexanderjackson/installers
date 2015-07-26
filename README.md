@@ -4,6 +4,14 @@ Installer for the open source email helpdesk from [Ivaldi](https://ivaldi.nl/) n
 
 [Visit Brimir on GitHub here](https://github.com/ivaldi/brimir)
 
+### Install on Debian Jessie 64bit with minimal system.
+<pre>
+apt-get update
+apt-get install curl -y
+cd /usr/src/
+curl -OL https://raw.githubusercontent.com/alexanderjackson/installers/master/brimir-on-debian-jessie-amd64
+bash brimir-on-debian-jessie-amd64
+</pre>
 
 ## License
 Copyright 2015, Alexander Jackson <alexander.jackson@jackson-it.de>
