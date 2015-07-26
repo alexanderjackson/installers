@@ -4,7 +4,8 @@ Installer for the open source email helpdesk from [Ivaldi](https://ivaldi.nl/) n
 
 [Visit Brimir on GitHub here](https://github.com/ivaldi/brimir)
 
-### Install on Debian Jessie 64bit with minimal system.
+### Install on Debian Jessie (64 bit)
+Install minimal system. Only select SSH server during Software selection, if needed. Then run the following lines on the command line:
 <pre>
 apt-get update
 apt-get install curl -y
