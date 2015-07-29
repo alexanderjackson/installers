@@ -272,7 +272,7 @@ EOF
 # -------------------------------------------
 # Brimir Dependencies
 # -------------------------------------------
-apt-get install apt-transport-https ca-certificates git ruby ruby-dev ruby-execjs ruby-mysql2 zlib1g-dev make gcc -y
+apt-get install apt-transport-https ca-certificates file ghostscript git imagemagick ruby ruby-dev ruby-execjs ruby-mysql2 zlib1g-dev make gcc -y
 gem install bundler
 
 
