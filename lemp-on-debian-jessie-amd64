@@ -241,10 +241,10 @@ rm -r /etc/nginx/conf.d/*
 cat > /etc/nginx/conf.d/default.conf <<'ENDOFILE'
 server {
         listen       80;
-        server_name  ${HOSTNAME} *.${HOSTNAME};
+        server_name  HOSTNAME *.HOSTNAME;
         # return 301 https://$http_host$request_uri; # Uncomment to force https redirect
 
-        root /var/www/${HOSTNAME}/public/;
+        root /var/www/HOSTNAME/public/;
 
         index index.php index.html;
 
@@ -288,15 +288,15 @@ server {
 
 server {
         listen       443 spdy;
-        server_name  ${HOSTNAME} *.${HOSTNAME};
+        server_name  HOSTNAME *.HOSTNAME;
 
         spdy_headers_comp 6;
 
         ssl on;
-        ssl_certificate /etc/nginx/ssl/bettenkunst.crt;
-        ssl_certificate_key /etc/nginx/ssl/bettenkunst.key;
+        ssl_certificate /etc/nginx/ssl/HOSTNAME.crt;
+        ssl_certificate_key /etc/nginx/ssl/HOSTNAME.key;
 
-        root /var/www/${HOSTNAME}/public/;
+        root /var/www/HOSTNAME/public/;
 
         index index.php index.html;
 
@@ -339,17 +339,17 @@ server {
 
 server {
         listen       80;
-        server_name  phpmyadmin.${HOSTNAME};
+        server_name  phpmyadmin.HOSTNAME;
         return 301 https://$http_host$request_uri;
         }
 
 server {
         listen       443 spdy;
-        server_name  phpmyadmin.${HOSTNAME};
+        server_name  phpmyadmin.HOSTNAME;
 
         ssl on;
-        ssl_certificate /etc/ssl/certs/bettenkunst.crt;
-        ssl_certificate_key /etc/ssl/private/bettenkunst.key;
+        ssl_certificate /etc/ssl/certs/HOSTNAME.crt;
+        ssl_certificate_key /etc/ssl/private/HOSTNAME.key;
 
         root /usr/share/phpmyadmin;
 
@@ -376,6 +376,10 @@ server {
 }
 ENDOFILE
 
+eval "sed -i 's/HOSTNAME/${HOSTNAME}/' /etc/nginx/conf.d/default.conf"
+
+
+
 mkdir -p /var/www/${HOSTNAME}/public/ /var/www/.ssh/
 cat > /var/www/${HOSTNAME}/public/index.html << EOF
 Hello World!
@@ -388,8 +392,8 @@ EOF
 chown -R www-data.www-data /var/www/
 
 mkdir /etc/nginx/ssl/
-openssl genrsa -out /etc/nginx/ssl/bettenkunst.key 4096
-cat > /etc/nginx/ssl/bettenkunst.cnf << EOF
+openssl genrsa -out /etc/nginx/ssl/${HOSTNAME}.key 4096
+cat > /etc/nginx/ssl/${HOSTNAME}.cnf << EOF
 [req]
 distinguished_name = req_distinguished_name
 x509_extensions = v3_ca
@@ -413,8 +417,9 @@ subjectAltName = @alt_names
 DNS.1 = localhost
 DNS.2 = $(hostname -f)
 DNS.3 = $(hostname -s)
+DNS.4 = *.$(hostname -f)
 EOF
-openssl req -new -x509 -key /etc/nginx/ssl/bettenkunst.key -out /etc/nginx/ssl/bettenkunst.crt -days 10950 -config /etc/nginx/ssl/bettenkunst.cnf -sha256
+openssl req -new -x509 -key /etc/nginx/ssl/${HOSTNAME}.key -out /etc/nginx/ssl/${HOSTNAME}.crt -days 10950 -config /etc/nginx/ssl/${HOSTNAME}.cnf -sha256
 
 systemctl restart nginx
 
