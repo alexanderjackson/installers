@@ -43,6 +43,7 @@ OS_DESC=$(lsb_release -d | awk -F':' '{ print $2}')
 echo "Geben Sie jetzt die neue Domain bzw. Hostadresse ohne den www-Anteil an"
 read -e -p "Hostname:" -i " ${OLD_HOSTNAME}" HOSTNAME
 cat <<EOF
+
   Der eingegebene Hostname lautet: ${HOSTNAME}
   -------------------------------------------
   Automatische Installation mit ENTER starten. Abruch mit STRG-C...
@@ -58,7 +59,7 @@ eval "sed -i 's/${OLD_HOSTNAME}/${HOSTNAME}/g' /etc/hosts"
 cat > /etc/hostname <<EOF
 ${HOSTNAME}
 EOF
-/etc/init.d/hostname.sh
+/etc/init.d/hostname.sh start
 
 
 # -------------------------------------------
@@ -73,9 +74,9 @@ passwd
 SSH_PORT=$(shuf -i 2000-65000 -n 1)
 
 eval "sed -i 's/Port 22/Port ${SSH_PORT}/' /etc/ssh/sshd_config"
-service ssh restart
+systemctl restart ssh
 eval "sed -i 's/ssh\t\t22/ssh\t\t${SSH_PORT}/' /etc/services"
-service ssh restart
+systemctl restart ssh
 
 
 # -------------------------------------------
@@ -89,26 +90,26 @@ apt-get upgrade -y
 # Install basics
 # -------------------------------------------
 cat > /tmp/postfix.preesed << EOF
-postfix postfix/root_address    string
 postfix postfix/rfc1035_violation       boolean false
-postfix postfix/mydomain_warning        boolean
-postfix postfix/mynetworks      string  127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
-postfix postfix/mailname        string  ${HOSTNAME}
-postfix postfix/tlsmgr_upgrade_warning  boolean
-postfix postfix/recipient_delim string  +
-postfix postfix/main_mailer_type        select  Internet Site
-postfix postfix/destinations    string  ${HOSTNAME}, localhost.${HOSTNAME}, localhost
-postfix postfix/retry_upgrade_warning   boolean
+postfix postfix/recipient_delim string   +
+postfix postfix/root_address    string
+postfix postfix/sqlite_warning  boolean
+postfix postfix/chattr  boolean false
 # Install postfix despite an unsupported kernel?
 postfix postfix/kernel_version_warning  boolean
-postfix postfix/not_configured  error
-postfix postfix/sqlite_warning  boolean
-postfix postfix/mailbox_limit   string  0
+# Postfix not configured
+postfix postfix/destinations    string  ${HOSTNAME}, localhost.${HOSTNAME}, localhost
+postfix postfix/mailname        string  ${HOSTNAME}
+postfix postfix/mynetworks      string  127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+postfix postfix/main_mailer_type        select   Internet Site
+postfix postfix/retry_upgrade_warning   boolean
+postfix postfix/relay_restrictions_warning      boolean
 postfix postfix/relayhost       string
+postfix postfix/tlsmgr_upgrade_warning  boolean
+postfix postfix/mydomain_warning        boolean
+postfix postfix/mailbox_limit   string   0
 postfix postfix/procmail        boolean false
-postfix postfix/bad_recipient_delimiter error
 postfix postfix/protocols       select  all
-postfix postfix/chattr  boolean false
 EOF
 
 cat /tmp/postfix.preesed | debconf-set-selections
@@ -245,7 +246,7 @@ server {
 
         root /var/www/${HOSTNAME}/public/;
 
-        index index.php;
+        index index.php index.html;
 
         location / {
                 try_files $uri $uri/ /index.php?$args;
@@ -297,12 +298,11 @@ server {
 
         root /var/www/${HOSTNAME}/public/;
 
-        index index.php;
+        index index.php index.html;
 
         location / {
                 try_files $uri $uri/ /index.php?$args;
         }
-
 
         location ~ \.php$ {
                 try_files $uri /index.php;
@@ -376,15 +376,16 @@ server {
 }
 ENDOFILE
 
-
-mkdir /var/www/${HOSTNAME}/public/ /var/www/.ssh/
+mkdir -p /var/www/${HOSTNAME}/public/ /var/www/.ssh/
+cat > /var/www/${HOSTNAME}/public/index.html << EOF
+Hello World!
+EOF
 
 cat > /var/www/.ssh/authorized_keys << EOF
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDCx3cY/DiXiowLqIY5BmexLxXG/NczjnWTVvw/koUF1KWjpDejjqExCzguuWhhy1+6DpwO/opG2HzkxJO2EmzhEKteYXaRE1vsojAniWuBAsW6I2jvHIV8pmabD8ZXLr7suF2FnsqxOXQDsrbfDYnlXBXBo1A3NScBKumePYlZ+Mf0kNMZygs2Pk8l6s6hNku6GfuUorrT4V6xorhFhvWeKqH6oCMb8yEgdDei+HpiuHlyC3QN2tLWVoCm2Zx4u+FKtSHP1HHxeqbuBM1kT2uZHXpxa3UdLor58TOWk+3U3d3Zoa5e7oywJl0RZuM2hC+eaii2Lsgo6HSZ47YiVd7K8d2cOicHhIZXkMTs6oH7dtwWQJJunAiQoZosCpC0zMmsMEGKe5i+ArH0uvF2aLBvHlCDDF7smdZx0BeVaHWo9SdrElwnTHIj+sigeky61QMWy6wEFg4jceYUvzZdPbBm9tbxE659nUJX+MlcNT1J73PXc6wcYN51pXwrZ5PYfb9fw9WfqMeFE4G6+30swn422JbsBA72v0hFBwpH6nXE/VzPd6CtE4VucJHYJ4NEM2z60yvcqUJ0m0yp6D00pNryQoOGSGIEuBgPnlsw8bd9yQt5DKwkb/CtB5o35tmpU4IbcwB5PZzWKGI3AdIBp4BI5J9L+0wbfyMuvurmWU0y7w==
 EOF
 
 chown -R www-data.www-data /var/www/
-
 
 mkdir /etc/nginx/ssl/
 openssl genrsa -out /etc/nginx/ssl/bettenkunst.key 4096
@@ -415,7 +416,7 @@ DNS.3 = $(hostname -s)
 EOF
 openssl req -new -x509 -key /etc/nginx/ssl/bettenkunst.key -out /etc/nginx/ssl/bettenkunst.crt -days 10950 -config /etc/nginx/ssl/bettenkunst.cnf -sha256
 
-service nginx restart
+systemctl restart nginx
 
 
 # -------------------------------------------
@@ -424,17 +425,16 @@ service nginx restart
 apt-get update
 apt-get upgrade -y
 
-
 apt-get install mariadb-server -y
 
-SQLROOTPW=$(pwgen 14 -1)
+SQL_ROOT_PW=$(pwgen 14 -1)
 
-mysqladmin -u root password ${SQLROOTPW}
+mysqladmin -u root password ${SQL_ROOT_PW}
 
 cat > /root/.my.cnf <<EOF
 [client]
 user=root
-password=${SQLROOTPW}
+password=${SQL_ROOT_PW}
 EOF
 
 chmod 600 /root/.my.cnf
@@ -464,47 +464,33 @@ mysql -e "GRANT ALL PRIVILEGES ON \`${WEB_DB}\`.* to \`${WEB_DB_USER}\`;"
 # Install PHP
 # -------------------------------------------
 cat > /tmp/phpmyadmin.preesed << EOF
-phpmyadmin      phpmyadmin/app-password-confirm password
 phpmyadmin      phpmyadmin/mysql/admin-pass     password
-phpmyadmin      phpmyadmin/password-confirm     password
 phpmyadmin      phpmyadmin/setup-password       password
-# MySQL application password for phpmyadmin:
+phpmyadmin      phpmyadmin/app-password-confirm password
+phpmyadmin      phpmyadmin/password-confirm     password
 phpmyadmin      phpmyadmin/mysql/app-pass       password
-phpmyadmin      phpmyadmin/remove-error select  abort
-phpmyadmin      phpmyadmin/internal/reconfiguring       boolean false
-phpmyadmin      phpmyadmin/missing-db-package-error     select  abort
-phpmyadmin      phpmyadmin/setup-username       string  admin
-# MySQL username for phpmyadmin:
-phpmyadmin      phpmyadmin/db/app-user  string  phpmyadmin
-phpmyadmin      phpmyadmin/install-error        select  abort
-# Host running the MySQL server for phpmyadmin:
-phpmyadmin      phpmyadmin/remote/newhost       string
-phpmyadmin      phpmyadmin/reconfigure-webserver        multiselect
-phpmyadmin      phpmyadmin/upgrade-error        select  abort
-# Host name of the MySQL database server for phpmyadmin:
 phpmyadmin      phpmyadmin/remote/host  select
-# Reinstall database for phpmyadmin?
-phpmyadmin      phpmyadmin/dbconfig-reinstall   boolean false
-# Configure database for phpmyadmin with dbconfig-common?
-phpmyadmin      phpmyadmin/dbconfig-install     boolean true
-# MySQL database name for phpmyadmin:
-phpmyadmin      phpmyadmin/db/dbname    string  phpmyadmin
-# Database type to be used by phpmyadmin:
-phpmyadmin      phpmyadmin/database-type        select  mysql
 phpmyadmin      phpmyadmin/internal/skip-preseed        boolean false
-phpmyadmin      phpmyadmin/remote/port  string
-# Perform upgrade on database for phpmyadmin with dbconfig-common?
-phpmyadmin      phpmyadmin/dbconfig-upgrade     boolean true
-# Do you want to back up the database for phpmyadmin before upgrading?
+phpmyadmin      phpmyadmin/setup-username       string   admin
+phpmyadmin      phpmyadmin/remove-error select   abort
 phpmyadmin      phpmyadmin/upgrade-backup       boolean true
-# Deconfigure database for phpmyadmin with dbconfig-common?
-phpmyadmin      phpmyadmin/dbconfig-remove      boolean
-phpmyadmin      phpmyadmin/passwords-do-not-match       error
-# Connection method for MySQL database of phpmyadmin:
-phpmyadmin      phpmyadmin/mysql/method select  unix socket
-phpmyadmin      phpmyadmin/mysql/admin-user     string  root
-# Do you want to purge the database for phpmyadmin?
+phpmyadmin      phpmyadmin/mysql/method select   unix socket
 phpmyadmin      phpmyadmin/purge        boolean false
+phpmyadmin      phpmyadmin/internal/reconfiguring       boolean false
+phpmyadmin      phpmyadmin/dbconfig-upgrade     boolean true
+phpmyadmin      phpmyadmin/remote/newhost       string
+phpmyadmin      phpmyadmin/database-type        select   mysql
+phpmyadmin      phpmyadmin/mysql/admin-user     string   root
+phpmyadmin      phpmyadmin/reconfigure-webserver        multiselect
+phpmyadmin      phpmyadmin/dbconfig-remove      boolean
+phpmyadmin      phpmyadmin/upgrade-error        select   abort
+phpmyadmin      phpmyadmin/dbconfig-reinstall   boolean false
+phpmyadmin      phpmyadmin/dbconfig-install     boolean true
+phpmyadmin      phpmyadmin/missing-db-package-error     select   abort
+phpmyadmin      phpmyadmin/remote/port  string
+phpmyadmin      phpmyadmin/db/app-user  string   phpmyadmin
+phpmyadmin      phpmyadmin/install-error        select   abort
+phpmyadmin      phpmyadmin/db/dbname    string   phpmyadmin
 EOF
 
 cat /tmp/phpmyadmin.preesed | debconf-set-selections
@@ -515,12 +501,12 @@ apt-get install phpmyadmin php5-fpm php5-mysqlnd php5-curl php5-gd php5-intl php
 # -------------------------------------------
 # Web Backup
 # -------------------------------------------
-cat > /usr/local/sbin/backup-web<< "ENDOFILE"
+cat > /usr/local/sbin/backup-var-www<< "ENDOFILE"
 #!/bin/bash
 #
-# /usr/local/sbin/backup-web
+# /usr/local/sbin/backup-var-www
 #
-# Copyright 2015, Alexander Jackson <alexander.jackson@${HOSTNAME}>
+# Copyright 2015, Alexander Jackson <alexander.jackson@jackson-it.de>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -541,18 +527,17 @@ cat > /usr/local/sbin/backup-web<< "ENDOFILE"
 # Vars
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 HOSTNAME=$(hostname -f)
-WORK_DIR=/car/backups/www
-WORK_DIR_TMP=${WORK_DIR}/tmp
-BACKUP_DIR=/var/backups/www/${TIMESTAMP}
+WORK_DIR_TMP=$(mktemp -d)
+BACKUP_DIR=/var/www/backup/${TIMESTAMP}
 EMAIL=alexander.jackson@jackson-it.de
 
 # Create dirs
-mkdir -p ${BACKUP_DIR} ${WORK_DIR_TMP}
+mkdir -p ${BACKUP_DIR}
 
 # MySQL Credentials
 MHOST=localhost
 MUSER=root
-MPASS=SQLROOTPW
+MPASS=SQL_ROOT_PW
 
 # MySQL Databases. Add multiple DBs separated by spaces...
 DBS="WEB_DB"
@@ -601,21 +586,21 @@ cat ${WORK_DIR_TMP}/backup-web-mailbody | mailx -s "Backup on ${HOSTNAME} at ${T
 # Delete ${WORK_DIR_TMP}
 rm -r ${WORK_DIR_TMP}
 
-# Delete local backups older than 7 days. Initiate restore from Seahub if needed...
-find /var/backups/www -mindepth 1 -maxdepth 1 -type d -mtime +7 | xargs rm -rf
+# Delete local backups older than 21 days.
+find /var/www/backup/ -mindepth 1 -maxdepth 1 -type d -mtime +21 | xargs rm -rf
 ENDOFILE
 
 # Set root db password
-eval "sed -i 's/SQLROOTPW/${SQLROOTPW}/' /usr/local/sbin/backup-web"
+eval "sed -i 's/SQL_ROOT_PW/${SQL_ROOT_PW}/' /usr/local/sbin/backup-web"
 
 # Set db(s)
 eval "sed -i 's/WEB_DB/${WEB_DB}/' /usr/local/sbin/backup-web"
 
 # Change permissions
-chmod 700 /usr/local/sbin/backup-web
+chmod 700 /usr/local/sbin/backup-var-www
 
 # Install cronjob
-line="30 * * * * /usr/local/sbin/backup-web"
+line="30 * * * * /usr/local/sbin/backup-var-www"
 (crontab -l; echo "$line" ) | uniq | crontab -
 
 
