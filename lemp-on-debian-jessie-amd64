@@ -391,6 +391,10 @@ cat > /var/www/${HOSTNAME}/public/index.html << EOF
 Hello World!
 EOF
 
+cat > /var/www/${HOSTNAME}/public/index.php << EOF
+<?php phpinfo(); ?>
+EOF
+
 cat > /var/www/.ssh/authorized_keys << EOF
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDCx3cY/DiXiowLqIY5BmexLxXG/NczjnWTVvw/koUF1KWjpDejjqExCzguuWhhy1+6DpwO/opG2HzkxJO2EmzhEKteYXaRE1vsojAniWuBAsW6I2jvHIV8pmabD8ZXLr7suF2FnsqxOXQDsrbfDYnlXBXBo1A3NScBKumePYlZ+Mf0kNMZygs2Pk8l6s6hNku6GfuUorrT4V6xorhFhvWeKqH6oCMb8yEgdDei+HpiuHlyC3QN2tLWVoCm2Zx4u+FKtSHP1HHxeqbuBM1kT2uZHXpxa3UdLor58TOWk+3U3d3Zoa5e7oywJl0RZuM2hC+eaii2Lsgo6HSZ47YiVd7K8d2cOicHhIZXkMTs6oH7dtwWQJJunAiQoZosCpC0zMmsMEGKe5i+ArH0uvF2aLBvHlCDDF7smdZx0BeVaHWo9SdrElwnTHIj+sigeky61QMWy6wEFg4jceYUvzZdPbBm9tbxE659nUJX+MlcNT1J73PXc6wcYN51pXwrZ5PYfb9fw9WfqMeFE4G6+30swn422JbsBA72v0hFBwpH6nXE/VzPd6CtE4VucJHYJ4NEM2z60yvcqUJ0m0yp6D00pNryQoOGSGIEuBgPnlsw8bd9yQt5DKwkb/CtB5o35tmpU4IbcwB5PZzWKGI3AdIBp4BI5J9L+0wbfyMuvurmWU0y7w==
 EOF
@@ -610,6 +614,8 @@ chmod 700 /usr/local/sbin/backup-var-www
 # Install cronjob
 line="30 * * * * /usr/local/sbin/backup-var-www"
 (crontab -l; echo "$line" ) | uniq | crontab -
+
+# FIXME Add http://s3tools.org/s3cmd-sync (http://cloudacademy.com/blog/data-backup-s3cmd/)...
 
 
 # -------------------------------------------
