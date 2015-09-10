@@ -36,6 +36,8 @@ fi
 OS=$(lsb_release -c | awk '{ print $2 }')
 OS_DESC=$(lsb_release -d | awk -F':' '{ print $2}')
 
+EXTERNAL_IP=$(nc 4.ifcfg.me 23 | grep IPv4 | cut -d' ' -f4)
+
 
 # -------------------------------------------
 # Get hostname
@@ -354,8 +356,8 @@ server {
         server_name  phpmyadmin.HOSTNAME;
 
         ssl on;
-        ssl_certificate /etc/ssl/certs/HOSTNAME.crt;
-        ssl_certificate_key /etc/ssl/private/HOSTNAME.key;
+        ssl_certificate /etc/nginx/ssl/HOSTNAME.crt;
+        ssl_certificate_key /etc/nginx/ssl/HOSTNAME.key;
 
         root /usr/share/phpmyadmin;
 
@@ -408,7 +410,7 @@ countryName = DE
 stateOrProvinceName = Bayern
 localityName = Wiesentheid
 organizationName = Jackson IT
-organizationalUnitName = Web Hosting
+organizationalUnitName = $(hostname -f)
 emailAddress = postmaster@$(hostname -f)
 
 [v3_ca]
@@ -420,8 +422,9 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = localhost
 DNS.2 = $(hostname -f)
-DNS.3 = $(hostname -s)
-DNS.4 = *.$(hostname -f)
+DNS.3 = *.$(hostname -f)
+IP.1 = 127.0.0.1
+IP.2 = ${EXTERNAL_IP}
 EOF
 openssl req -new -x509 -key /etc/nginx/ssl/${HOSTNAME}.key -out /etc/nginx/ssl/${HOSTNAME}.crt -days 10950 -config /etc/nginx/ssl/${HOSTNAME}.cnf -sha256
 
@@ -536,9 +539,10 @@ cat > /usr/local/sbin/backup-var-www<< "ENDOFILE"
 # Vars
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 HOSTNAME=$(hostname -f)
-WORK_DIR_TMP=$(mktemp -d)
 BACKUP_DIR=/var/www/backup/${TIMESTAMP}
 EMAIL=alexander.jackson@jackson-it.de
+TEMP_MAIL_BODY=$(mktemp)
+BACKUPS_KEEP_DAYS=21
 
 # Create dirs
 mkdir -p ${BACKUP_DIR}
@@ -553,57 +557,52 @@ DBS="WEB_DB"
 
 # Backup DBs
 for i in ${DBS}; do
-  mysqldump -h ${MHOST} -u${MUSER} -p${MPASS} --opt ${i} > ${WORK_DIR_TMP}/db_${i}.sql ;
+  mysqldump -h ${MHOST} -u${MUSER} -p${MPASS} --opt ${i} > ${BACKUP_DIR}/db_${i}.sql ;
 done
 
 # Additional dump of all DBs
-mysqldump -h ${MHOST} -u${MUSER} -p${MPASS} --all-databases > ${WORK_DIR_TMP}/db_all.sql
+mysqldump -h ${MHOST} -u${MUSER} -p${MPASS} --all-databases > ${BACKUP_DIR}/db_all.sql
 
-
-# Backup /etc and /var/www
-cp -a /etc ${WORK_DIR_TMP}/dir_etc
-cp -a /var/www ${WORK_DIR_TMP}/dir_var_www
-
-
-# Compress etc var_www
-tar czf ${BACKUP_DIR}/db_${i}.sql.tgz ${WORK_DIR_TMP}/db_${i}.sql
-tar czf ${BACKUP_DIR}/db_all.sql.tgz ${WORK_DIR_TMP}/db_all.sql
-tar czf ${BACKUP_DIR}/dir_etc.tgz ${WORK_DIR_TMP}/dir_etc
-tar czf ${BACKUP_DIR}/dir_var_www.tgz ${WORK_DIR_TMP}/dir_var_www
-
+# Backup, compress and clean-up the mess we made...
+tar czf ${BACKUP_DIR}/db_${i}.sql.tgz ${BACKUP_DIR}/db_${i}.sql
+tar czf ${BACKUP_DIR}/db_all.sql.tgz ${BACKUP_DIR}/db_all.sql
+rm ${BACKUP_DIR}/db_${i}.sql ${BACKUP_DIR}/db_all.sql
+tar czf ${BACKUP_DIR}/dir_etc.tgz /etc
+tar czf ${BACKUP_DIR}/dir_var_www.tgz /var/www --exclude='backup'
 
 # Mailbody head
-cat > ${WORK_DIR_TMP}/backup-web-mailbody << EOF
-Files from last backup on ${HOSTNAME} at ${TIMESTAMP}:
+cat > ${TEMP_MAIL_BODY} << EOF
+Files from last backup on ${HOSTNAME} at ${TIMESTAMP}.
 
+ls -ahl ${BACKUP_DIR} | sort
 EOF
 
 # Find files from current backup and add list to mailbody
-find ${BACKUP_DIR} -type f | sort >> ${WORK_DIR_TMP}/backup-web-mailbody
+ls -ahl ${BACKUP_DIR} | sort >> ${TEMP_MAIL_BODY}
 
 # Mailbody foot
-cat >> ${WORK_DIR_TMP}/backup-web-mailbody << EOF
+cat >> ${TEMP_MAIL_BODY} << EOF
 
-There might be more archives on the server...
-
-Visit https://XXXXX/www.${HOSTNAME}/${TIMESTAMP} for this backup. FIXME
+There might be more backup archives in /var/www/backup/ on ${HOSTNAME}...
 EOF
 
 # Send mailreport
-cat ${WORK_DIR_TMP}/backup-web-mailbody | mailx -s "Backup on ${HOSTNAME} at ${TIMESTAMP}" ${EMAIL}
+cat ${TEMP_MAIL_BODY} | mailx -s "Backup on server ${HOSTNAME} at ${TIMESTAMP}" ${EMAIL}
 
-# Delete ${WORK_DIR_TMP}
-rm -r ${WORK_DIR_TMP}
+# Delete ${TEMP_MAIL_BODY}
+rm -r ${TEMP_MAIL_BODY}
 
-# Delete local backups older than 21 days.
-find /var/www/backup/ -mindepth 1 -maxdepth 1 -type d -mtime +21 | xargs rm -rf
+# Delete local backups older than ${BACKUPS_KEEP_DAYS} days.
+find /var/www/backup/ -mindepth 1 -maxdepth 1 -type d -mtime +${BACKUPS_KEEP_DAYS}  | xargs rm -rf
+
+find /var/www/backup/ -type f -exec chmod -R 400 {} +
 ENDOFILE
 
 # Set root db password
-eval "sed -i 's/SQL_ROOT_PW/${SQL_ROOT_PW}/g' /usr/local/sbin/backup-web"
+eval "sed -i 's/SQL_ROOT_PW/${SQL_ROOT_PW}/g' /usr/local/sbin/backup-var-www"
 
 # Set db(s)
-eval "sed -i 's/WEB_DB/${WEB_DB}/g' /usr/local/sbin/backup-web"
+eval "sed -i 's/WEB_DB/${WEB_DB}/g' /usr/local/sbin/backup-var-www"
 
 # Change permissions
 chmod 700 /usr/local/sbin/backup-var-www
@@ -649,6 +648,15 @@ cat << EOF
   Address:  $(hostname -f) Port ${SSH_PORT}
   User:     www-data
   Pass:     not set, use private key instead
+
+
+  General Infos
+  -----------------------------------------------------------------
+  Hostname: $(hostname -f)
+  External IP:  ${EXTERNAL_IP}
+
+  Make sure you DNS setting for $(hostname -f) are set to ${EXTERNAL_IP}
+
 
   -----------------------------------------------------------------
   Hit return to proceed with creation of safe DH for NGINX. This
