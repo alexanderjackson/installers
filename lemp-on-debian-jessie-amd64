@@ -40,13 +40,19 @@ OS_DESC=$(lsb_release -d | awk -F':' '{ print $2}')
 # -------------------------------------------
 # Get hostname
 # -------------------------------------------
-echo "Geben Sie jetzt die neue Domain bzw. Hostadresse ohne den www-Anteil an"
-read -e -p "Hostname:" -i " ${OLD_HOSTNAME}" HOSTNAME
+cat <<EOF
+
+Geben Sie jetzt die neue Domain bzw. Hostadresse ohne den www-Anteil an.
+Löschen Sie ggf. den vorausgefüllten Domainvorschlag...
+
+EOF
+
+read -e -p "Hostname: " -i " ${OLD_HOSTNAME}" HOSTNAME
 cat <<EOF
 
   Der eingegebene Hostname lautet: ${HOSTNAME}
   -------------------------------------------
-  Automatische Installation mit ENTER starten. Abruch mit STRG-C...
+  Automatische Installation mit ENTER fortsetzen. Abruch mit STRG-C...
 
 EOF
 read dummy
@@ -59,7 +65,7 @@ eval "sed -i 's/${OLD_HOSTNAME}/${HOSTNAME}/g' /etc/hosts"
 cat > /etc/hostname <<EOF
 ${HOSTNAME}
 EOF
-/etc/init.d/hostname.sh start
+hostname ${HOSTNAME}
 
 
 # -------------------------------------------
@@ -73,9 +79,9 @@ passwd
 # -------------------------------------------
 SSH_PORT=$(shuf -i 2000-65000 -n 1)
 
-eval "sed -i 's/Port 22/Port ${SSH_PORT}/' /etc/ssh/sshd_config"
+eval "sed -i 's/Port 22/Port ${SSH_PORT}/g' /etc/ssh/sshd_config"
 systemctl restart ssh
-eval "sed -i 's/ssh\t\t22/ssh\t\t${SSH_PORT}/' /etc/services"
+eval "sed -i 's/ssh\t\t22/ssh\t\t${SSH_PORT}/g' /etc/services"
 systemctl restart ssh
 
 
@@ -376,9 +382,7 @@ server {
 }
 ENDOFILE
 
-eval "sed -i 's/HOSTNAME/${HOSTNAME}/' /etc/nginx/conf.d/default.conf"
-
-
+eval "sed -i 's/HOSTNAME/${HOSTNAME}/g' /etc/nginx/conf.d/default.conf"
 
 mkdir -p /var/www/${HOSTNAME}/public/ /var/www/.ssh/
 cat > /var/www/${HOSTNAME}/public/index.html << EOF
@@ -404,8 +408,8 @@ countryName = DE
 stateOrProvinceName = Bayern
 localityName = Wiesentheid
 organizationName = Jackson IT
-organizationalUnitName = Seahub
-emailAddress = postmaster@$(hostname -d)
+organizationalUnitName = Web Hosting
+emailAddress = postmaster@$(hostname -f)
 
 [v3_ca]
 subjectKeyIdentifier = hash
@@ -596,10 +600,10 @@ find /var/www/backup/ -mindepth 1 -maxdepth 1 -type d -mtime +21 | xargs rm -rf
 ENDOFILE
 
 # Set root db password
-eval "sed -i 's/SQL_ROOT_PW/${SQL_ROOT_PW}/' /usr/local/sbin/backup-web"
+eval "sed -i 's/SQL_ROOT_PW/${SQL_ROOT_PW}/g' /usr/local/sbin/backup-web"
 
 # Set db(s)
-eval "sed -i 's/WEB_DB/${WEB_DB}/' /usr/local/sbin/backup-web"
+eval "sed -i 's/WEB_DB/${WEB_DB}/g' /usr/local/sbin/backup-web"
 
 # Change permissions
 chmod 700 /usr/local/sbin/backup-var-www
